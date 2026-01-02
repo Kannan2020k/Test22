@@ -16,7 +16,7 @@
   --surfaceActive:#221a3d;
   --text:#fff;
   --sub:#b3b3b3;
-  --accent:#7C4DFF; /* PURPLE */
+  --accent:#7C4DFF;
 }
 *{box-sizing:border-box}
 
@@ -48,6 +48,12 @@ select{
   border:none;
   border-radius:8px;
   padding:8px 10px;
+  transition:all .2s;
+  cursor:pointer;
+}
+select:hover{
+  background:var(--surfaceActive);
+  transform:translateY(-2px);
 }
 
 /* LIST */
@@ -58,12 +64,37 @@ select{
   gap:1px;
 }
 
-/* LIST ANIMATION */
+/* ANIMATIONS */
 @keyframes listEnter{
   from{opacity:0;transform:translateY(14px)}
   to{opacity:1;transform:translateY(0)}
 }
 
+@keyframes pulse{
+  0%,100%{transform:scale(1)}
+  50%{transform:scale(1.05)}
+}
+
+@keyframes ripple{
+  0%{transform:scale(0);opacity:1}
+  100%{transform:scale(2.5);opacity:0}
+}
+
+@keyframes spin{
+  to{transform:rotate(360deg)}
+}
+
+@keyframes modalEnter{
+  from{opacity:0;transform:scale(0.9) translateY(20px)}
+  to{opacity:1;transform:scale(1) translateY(0)}
+}
+
+@keyframes successPop{
+  0%{transform:scale(0) rotate(-180deg);opacity:0}
+  100%{transform:scale(1) rotate(0);opacity:1}
+}
+
+/* CARD */
 .card{
   background:var(--surface);
   padding:12px;
@@ -72,6 +103,15 @@ select{
   align-items:flex-start;
   animation:listEnter .45s cubic-bezier(.2,.8,.2,1) forwards;
   opacity:0;
+  transition:all .3s cubic-bezier(.2,.8,.2,1);
+  cursor:pointer;
+  position:relative;
+  overflow:hidden;
+}
+
+.card:hover{
+  background:var(--surface2);
+  transform:translateX(8px);
 }
 
 .card:first-child{border-radius:20px 20px 0 0}
@@ -81,6 +121,16 @@ select{
 .card.playing{
   background:var(--surfaceActive);
   border-radius:50px !important;
+  animation:pulse 2s ease-in-out infinite;
+}
+
+.card.downloading{
+  pointer-events:none;
+  opacity:0.6;
+}
+
+.card.downloaded{
+  background:#1a4d2e !important;
 }
 
 /* IMAGE */
@@ -88,6 +138,13 @@ select{
   width:48px;height:48px;
   border-radius:50%;
   object-fit:cover;
+  transition:all .3s;
+}
+.card:hover img{
+  transform:rotate(5deg) scale(1.1);
+}
+.card.playing img{
+  animation:spin 3s linear infinite;
 }
 
 /* TEXT */
@@ -96,9 +153,11 @@ select{
   white-space:nowrap;
   overflow:hidden;
   text-overflow:ellipsis;
+  transition:all .2s;
 }
 .title{font-size:14px;font-weight:600}
 .meta{font-size:12px;color:var(--sub);margin-top:4px}
+.card:hover .title{color:var(--accent)}
 
 /* PLAY BUTTON */
 .play-wrap{
@@ -109,13 +168,36 @@ select{
   align-items:center;
   justify-content:center;
   cursor:pointer;
+  transition:all .3s cubic-bezier(.34,1.56,.64,1);
+  position:relative;
+}
+.play-wrap:hover{
+  transform:scale(1.15);
+  background:var(--accent);
+}
+.play-wrap:hover .material-icons{color:#000}
+.play-wrap:active{
+  transform:scale(0.95);
 }
 .play-wrap.playing{background:var(--accent)}
 .play-wrap .material-icons{
   font-size:26px;
   color:var(--accent);
+  transition:all .2s;
+  position:relative;
+  z-index:1;
 }
 .play-wrap.playing .material-icons{color:#000}
+
+.ripple-effect{
+  position:absolute;
+  border-radius:50%;
+  background:rgba(124,77,255,0.4);
+  width:40px;height:40px;
+  animation:ripple .6s ease-out;
+  pointer-events:none;
+  z-index:0;
+}
 
 /* FLOATING BUTTONS */
 .fab,
@@ -131,9 +213,21 @@ select{
   justify-content:center;
   box-shadow:0 6px 16px rgba(0,0,0,.4);
   cursor:pointer;
+  transition:all .3s cubic-bezier(.34,1.56,.64,1);
 }
 
-.fab{bottom:24px;font-size:28px}
+.fab:hover,
+.download-all:hover{
+  transform:scale(1.15) rotate(5deg);
+  box-shadow:0 8px 24px rgba(124,77,255,.5);
+}
+
+.fab:active,
+.download-all:active{
+  transform:scale(0.9);
+}
+
+.fab{bottom:24px;font-size:28px;color:#000;font-weight:bold}
 .download-all{bottom:92px;display:none}
 
 .download-all .material-icons{
@@ -148,7 +242,8 @@ select{
   background:var(--surface);
   padding:20px;
   border-radius:20px 20px 0 0;
-  transition:.35s;
+  transition:.35s cubic-bezier(.2,.8,.2,1);
+  box-shadow:0 -4px 20px rgba(0,0,0,.5);
 }
 .sheet.open{bottom:0}
 .sheet input,.sheet button{
@@ -157,9 +252,101 @@ select{
   border-radius:8px;
   border:none;
   margin-bottom:12px;
+  transition:all .2s;
 }
-.sheet input{background:var(--surface2);color:white}
-.sheet button{background:var(--accent);color:#000}
+.sheet input{
+  background:var(--surface2);
+  color:white;
+}
+.sheet input:focus{
+  outline:2px solid var(--accent);
+  transform:translateY(-2px);
+}
+.sheet button{
+  background:var(--accent);
+  color:#000;
+  cursor:pointer;
+  font-weight:600;
+}
+.sheet button:hover{
+  transform:translateY(-2px);
+  box-shadow:0 4px 12px rgba(124,77,255,.4);
+}
+.sheet button:active{
+  transform:scale(0.98);
+}
+
+/* PROGRESS MODAL */
+.progress-modal{
+  position:fixed;
+  top:0;left:0;right:0;bottom:0;
+  background:rgba(0,0,0,.85);
+  display:none;
+  align-items:center;
+  justify-content:center;
+  z-index:1000;
+  backdrop-filter:blur(10px);
+}
+.progress-modal.show{display:flex}
+
+.progress-content{
+  background:var(--surface);
+  padding:30px;
+  border-radius:20px;
+  min-width:320px;
+  text-align:center;
+  animation:modalEnter .3s cubic-bezier(.2,.8,.2,1);
+}
+
+.progress-title{
+  font-size:20px;
+  font-weight:700;
+  margin-bottom:20px;
+}
+
+.progress-bar-container{
+  background:var(--surface2);
+  height:8px;
+  border-radius:10px;
+  overflow:hidden;
+  margin-bottom:12px;
+}
+
+.progress-bar{
+  height:100%;
+  background:linear-gradient(90deg,var(--accent),#b47dff);
+  width:0%;
+  transition:width .3s;
+  border-radius:10px;
+}
+
+.progress-text{
+  color:var(--sub);
+  font-size:14px;
+  margin-top:8px;
+}
+
+.success-icon{
+  font-size:64px;
+  color:#4caf50;
+  animation:successPop .5s cubic-bezier(.34,1.56,.64,1);
+}
+
+.close-btn{
+  margin-top:20px;
+  padding:10px 24px;
+  background:var(--accent);
+  border:none;
+  border-radius:8px;
+  color:#000;
+  font-weight:600;
+  cursor:pointer;
+  transition:all .2s;
+}
+.close-btn:hover{
+  transform:translateY(-2px);
+  box-shadow:0 4px 12px rgba(124,77,255,.4);
+}
 </style>
 </head>
 
@@ -194,6 +381,16 @@ select{
   <button id="loadBtn">Load</button>
 </div>
 
+<div class="progress-modal" id="progressModal">
+  <div class="progress-content">
+    <div class="progress-title" id="progressTitle">Downloading Songs...</div>
+    <div class="progress-bar-container">
+      <div class="progress-bar" id="progressBar"></div>
+    </div>
+    <div class="progress-text" id="progressText">0 / 0</div>
+  </div>
+</div>
+
 <audio id="player"></audio>
 
 <script>
@@ -205,15 +402,43 @@ const trackCount = document.getElementById("trackCount");
 const player = document.getElementById("player");
 const qualitySelect = document.getElementById("quality");
 const downloadBtn = document.getElementById("downloadAll");
+const progressModal = document.getElementById("progressModal");
+const progressBar = document.getElementById("progressBar");
+const progressText = document.getElementById("progressText");
+const progressTitle = document.getElementById("progressTitle");
 
-let currentSongKey=null;
-let currentCard=null;
-const saavnCache={};
+let currentSongKey = null;
+let currentCard = null;
+const saavnCache = {};
 
-fab.onclick = () => sheet.classList.add("open");
+fab.onclick = () => {
+  sheet.classList.add("open");
+  createRipple(fab);
+};
+
+function createRipple(element){
+  const ripple = document.createElement("div");
+  ripple.className = "ripple-effect";
+  ripple.style.left = "50%";
+  ripple.style.top = "50%";
+  ripple.style.transform = "translate(-50%,-50%)";
+  
+  const parent = element.tagName === 'BUTTON' ? element : element.closest('.play-wrap') || element;
+  const existingPosition = parent.style.position;
+  if(!existingPosition || existingPosition === 'static'){
+    parent.style.position = "relative";
+  }
+  
+  parent.appendChild(ripple);
+  setTimeout(() => ripple.remove(), 600);
+}
 
 function getPlaylistId(url){
-  try{return new URL(url).pathname.split("/playlist/")[1]}catch{return null}
+  try{
+    return new URL(url).pathname.split("/playlist/")[1];
+  }catch{
+    return null;
+  }
 }
 
 async function prefetchSaavn(key){
@@ -226,15 +451,16 @@ loadBtn.onclick = async () => {
   const id = getPlaylistId(playlistUrl.value.trim());
   if(!id) return;
 
+  createRipple(loadBtn);
   sheet.classList.remove("open");
-  tracksDiv.innerHTML="";
-  downloadBtn.style.display="none";
+  tracksDiv.innerHTML = "";
+  downloadBtn.style.display = "none";
 
   const res = await fetch(`${SPOTIFY_API}?playlist=${id}`);
   const data = await res.json();
 
   const validTracks = data.tracks.filter(t =>
-    (t.title||"").trim() || (t.artists||"").trim()
+    (t.title || "").trim() || (t.artists || "").trim()
   );
 
   trackCount.textContent = `${validTracks.length} tracks`;
@@ -243,16 +469,17 @@ loadBtn.onclick = async () => {
     validTracks.map(t => prefetchSaavn(`${t.title} ${t.artists}`))
   );
 
-  downloadBtn.style.display="flex";
+  downloadBtn.style.display = "flex";
 
-  validTracks.forEach((t,i)=>{
+  validTracks.forEach((t, i) => {
     const key = `${t.title} ${t.artists}`;
 
-    const card=document.createElement("div");
-    card.className="card";
-    card.style.animationDelay=`${i*45}ms`;
+    const card = document.createElement("div");
+    card.className = "card";
+    card.style.animationDelay = `${i * 45}ms`;
+    card.dataset.key = key;
 
-    card.innerHTML=`
+    card.innerHTML = `
       <img src="${t.image}">
       <div class="card-info">
         <div class="title">${t.title}</div>
@@ -263,19 +490,22 @@ loadBtn.onclick = async () => {
       </div>
     `;
 
-    const playBtn=card.querySelector(".play-wrap");
-    const icon=playBtn.querySelector(".material-icons");
+    const playBtn = card.querySelector(".play-wrap");
+    const icon = playBtn.querySelector(".material-icons");
 
-    playBtn.onclick=()=>{
-      if(currentSongKey===key){
+    playBtn.onclick = (e) => {
+      e.stopPropagation();
+      createRipple(playBtn);
+      
+      if(currentSongKey === key){
         if(player.paused){
           player.play();
-          icon.textContent="pause";
+          icon.textContent = "pause";
           playBtn.classList.add("playing");
           card.classList.add("playing");
         }else{
           player.pause();
-          icon.textContent="play_arrow";
+          icon.textContent = "play_arrow";
           playBtn.classList.remove("playing");
           card.classList.remove("playing");
         }
@@ -285,55 +515,102 @@ loadBtn.onclick = async () => {
       if(currentCard){
         currentCard.classList.remove("playing");
         currentCard.querySelector(".play-wrap").classList.remove("playing");
-        currentCard.querySelector(".material-icons").textContent="play_arrow";
+        currentCard.querySelector(".material-icons").textContent = "play_arrow";
       }
 
-      const urls=saavnCache[key];
-      const q=qualitySelect.value;
-      const url=urls.find(u=>u.quality===q)?.url || urls.at(-1)?.url;
+      const urls = saavnCache[key];
+      const q = qualitySelect.value;
+      const url = urls.find(u => u.quality === q)?.url || urls.at(-1)?.url;
       if(!url) return;
 
-      player.src=url;
+      player.src = url;
       player.play();
 
-      icon.textContent="pause";
+      icon.textContent = "pause";
       playBtn.classList.add("playing");
       card.classList.add("playing");
 
-      currentSongKey=key;
-      currentCard=card;
+      currentSongKey = key;
+      currentCard = card;
     };
 
     tracksDiv.appendChild(card);
   });
 };
 
-/* 🔥 ADVANCED FORCED DOWNLOAD (BLOB) */
 downloadBtn.onclick = async () => {
+  createRipple(downloadBtn);
+  
   const q = qualitySelect.value;
+  const songs = Object.entries(saavnCache);
+  const total = songs.length;
+  let completed = 0;
 
-  for(const [song,urls] of Object.entries(saavnCache)){
-    const fileUrl = urls.find(u=>u.quality===q)?.url;
-    if(!fileUrl) continue;
+  progressModal.classList.add("show");
+  progressTitle.textContent = "Downloading Songs...";
+  progressBar.style.width = "0%";
+  progressText.textContent = `0 / ${total}`;
+
+  for(const [song, urls] of songs){
+    const fileUrl = urls.find(u => u.quality === q)?.url;
+    if(!fileUrl){
+      completed++;
+      continue;
+    }
 
     try{
+      const card = Array.from(tracksDiv.children).find(c => c.dataset.key === song);
+      if(card) card.classList.add("downloading");
+
       const res = await fetch(fileUrl);
       const blob = await res.blob();
 
       const blobUrl = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = blobUrl;
-      a.download = `${song}.mp4`;
+      a.download = `${song.replace(/[<>:"/\\|?*]/g, '_')}.mp4`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(blobUrl);
 
-      await new Promise(r=>setTimeout(r,400));
+      completed++;
+      
+      if(card){
+        card.classList.remove("downloading");
+        card.classList.add("downloaded");
+      }
+
+      const percent = Math.round((completed / total) * 100);
+      progressBar.style.width = `${percent}%`;
+      progressText.textContent = `${completed} / ${total}`;
+
+      await new Promise(r => setTimeout(r, 400));
     }catch(e){
-      console.error("Download failed:",song,e);
+      console.error("Download failed:", song, e);
+      completed++;
     }
   }
+
+  progressTitle.innerHTML = `
+    <span class="material-icons success-icon">check_circle</span>
+    <div style="margin-top:12px">Download Complete!</div>
+  `;
+  progressText.textContent = `All ${total} songs downloaded successfully`;
+  
+  const closeBtn = document.createElement("button");
+  closeBtn.className = "close-btn";
+  closeBtn.textContent = "Close";
+  closeBtn.onclick = () => {
+    progressModal.classList.remove("show");
+    setTimeout(() => {
+      document.querySelectorAll(".downloaded").forEach(c => c.classList.remove("downloaded"));
+      progressTitle.textContent = "Downloading Songs...";
+      document.querySelector(".close-btn")?.remove();
+    }, 300);
+  };
+  
+  document.querySelector(".progress-content").appendChild(closeBtn);
 };
 </script>
 
