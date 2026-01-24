@@ -106,12 +106,16 @@ let currentCard = null;
 let selectedQuality = "320kbps";
 const saavnCache = {};
 
-function getBestQuality(urls, preferred){
+// Only MP3
+function getBestMP3(urls, preferred){
   if(!Array.isArray(urls)) return null;
+
+  // filter MP3 only
+  const mp3Urls = urls.filter(u => u && u.url && u.url.endsWith(".mp3"));
+  if(mp3Urls.length === 0) return null;
+
   const order = ["96kbps","160kbps","320kbps"];
-  const sorted = urls
-    .filter(u => u && u.url && order.includes(u.quality))
-    .sort((a,b)=> order.indexOf(b.quality)-order.indexOf(a.quality));
+  const sorted = mp3Urls.sort((a,b)=>order.indexOf(b.quality)-order.indexOf(a.quality));
   return sorted.find(u=>u.quality===preferred) || sorted[0] || null;
 }
 
@@ -172,7 +176,7 @@ loadBtn.onclick = async ()=>{
     const playBtn = card.querySelector(".play-wrap");
     const icon = playBtn.querySelector(".material-icons");
     playBtn.onclick = ()=>{
-      const best = getBestQuality(saavnCache[key],selectedQuality);
+      const best = getBestMP3(saavnCache[key],selectedQuality);
       if(!best) return;
       if(currentCard){
         currentCard.classList.remove("playing");
@@ -199,21 +203,21 @@ downloadBtn.onclick = async ()=>{
   progressText.textContent=`0 / ${total}`;
 
   for(const [song, urls] of songs){
-    const best = getBestQuality(urls,selectedQuality);
+    const best = getBestMP3(urls,selectedQuality);
     if(!best){ done++; continue; }
 
-    // Ensure MP3 only
-    const blob = await (await fetch(best.url)).blob();
+    const res = await fetch(best.url);
+    const blob = await res.blob();
     const a = document.createElement("a");
-    a.href=URL.createObjectURL(blob);
-    a.download=`${song.replace(/[<>:"/\\|?*]/g,"_")}.mp3`; 
+    a.href = URL.createObjectURL(blob);
+    a.download = `${song.replace(/[<>:"/\\|?*]/g,"_")}.mp3`; 
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
 
     done++;
-    progressBar.style.width=`${(done/total)*100}%`;
-    progressText.textContent=`${done} / ${total}`;
+    progressBar.style.width = `${(done/total)*100}%`;
+    progressText.textContent = `${done} / ${total}`;
     await new Promise(r=>setTimeout(r,300));
   }
 
