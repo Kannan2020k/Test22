@@ -36,6 +36,7 @@ body{margin:0;font-family:'Varela Round',system-ui;background:var(--bg);color:va
 .card-info{flex:1;display:flex;flex-direction:column;overflow:hidden}
 .card-info .title{font-weight:bold;font-size:1rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .card-info .meta{font-size:0.8rem;color:var(--sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card-info .size{font-size:0.75rem;color:var(--sub);margin-top:2px;}
 .play-wrap, .download-wrap{display:flex;align-items:center;justify-content:center;width:44px;height:44px;border-radius:50%;cursor:pointer;transition:0.3s, transform 0.2s;font-size:20px;}
 .play-wrap{background:var(--accent);color:#fff;}
 .download-wrap{background:var(--accentLight);color:#fff;margin-left:5px;}
@@ -132,9 +133,10 @@ const playlistUrl = document.getElementById("playlistUrl");
 
 let currentSongKey = null;
 let currentCard = null;
-let selectedQuality = "160kbps";
+let selectedQuality = "320kbps";
 const saavnCache = {};
 
+// Utility: Get best quality track
 function getBestQuality(urls, preferred) {
   if (!Array.isArray(urls)) return null;
   const order = ["96kbps", "160kbps", "320kbps"];
@@ -144,6 +146,29 @@ function getBestQuality(urls, preferred) {
   return sorted.find(u => u.quality === preferred) || sorted[0] || null;
 }
 
+// Utility: Get file size
+async function getFileSize(url){
+  try{
+    const res = await fetch(url, { method: 'HEAD' });
+    const size = res.headers.get('Content-Length');
+    return size ? parseInt(size) : null;
+  }catch{
+    return null;
+  }
+}
+
+// Utility: Format bytes
+function formatBytes(bytes){
+  if(!bytes) return "Unknown";
+  const sizes = ['B','KB','MB','GB'];
+  let i = 0, value = bytes;
+  while(value >= 1024 && i < sizes.length-1){
+    value /= 1024; i++;
+  }
+  return `${value.toFixed(1)} ${sizes[i]}`;
+}
+
+// Quality selection
 document.querySelectorAll(".quality-btn").forEach(btn => {
   btn.onclick = () => {
     document.querySelectorAll(".quality-btn").forEach(b => b.classList.remove("active"));
@@ -152,8 +177,10 @@ document.querySelectorAll(".quality-btn").forEach(btn => {
   };
 });
 
+// FAB open
 fab.onclick = () => sheet.classList.add("open");
 
+// Extract Spotify playlist ID
 function getPlaylistId(url){
   try{
     const u = new URL(url);
@@ -163,12 +190,14 @@ function getPlaylistId(url){
   }
 }
 
+// Prefetch Saavn API
 async function prefetchSaavn(key){
   const res = await fetch(`${SAAVN_API}?query=${encodeURIComponent(key)}&limit=1`);
   const json = await res.json();
   saavnCache[key] = json?.data?.results?.[0]?.downloadUrl || [];
 }
 
+// Load playlist
 loadBtn.onclick = async () => {
   const id = getPlaylistId(playlistUrl.value.trim());
   if(!id) return;
@@ -185,7 +214,7 @@ loadBtn.onclick = async () => {
 
   await Promise.all(tracks.map(t => prefetchSaavn(`${t.title} ${t.artists}`)));
 
-  tracks.forEach((t) => {
+  tracks.forEach(async (t) => {
     const key = `${t.title} ${t.artists}`;
     const card = document.createElement("div");
     card.className = "card";
@@ -204,13 +233,40 @@ loadBtn.onclick = async () => {
       </div>
     `;
 
+    // Add size label
+    const sizeLabel = document.createElement("div");
+    sizeLabel.className = "size";
+    sizeLabel.textContent = "Fetching size...";
+    card.querySelector(".card-info").appendChild(sizeLabel);
+
     const playBtn = card.querySelector(".play-wrap");
     const icon = playBtn.querySelector(".material-icons");
     const downloadBtn = card.querySelector(".download-wrap");
 
+    // Get best URL and file size
+    const best = getBestQuality(saavnCache[key], selectedQuality);
+    if(best && best.url){
+      const size = await getFileSize(best.url);
+      sizeLabel.textContent = formatBytes(size);
+      if(size && size > 10 * 1024 * 1024){
+        sizeLabel.style.color = "red"; // red mark for large files
+      }
+    } else {
+      sizeLabel.textContent = "Not available";
+    }
+
+    // Play button
     playBtn.onclick = () => {
-      const best = getBestQuality(saavnCache[key], selectedQuality);
       if(!best) return;
+
+      // Pause toggle
+      if(currentSongKey === key && !player.paused){
+        player.pause();
+        icon.textContent = "play_arrow";
+        card.classList.remove("playing");
+        currentCard = null;
+        return;
+      }
 
       if(currentCard){
         currentCard.classList.remove("playing");
@@ -227,9 +283,9 @@ loadBtn.onclick = async () => {
       currentSongKey = key;
     };
 
+    // Download button
     downloadBtn.onclick = async (e) => {
-      e.stopPropagation(); // prevent play when clicking download
-      const best = getBestQuality(saavnCache[key], selectedQuality);
+      e.stopPropagation();
       if(!best) return;
 
       progressModal.classList.add("show");
