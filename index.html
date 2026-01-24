@@ -603,7 +603,7 @@ downloadBtn.onclick = async () => {
       const blobUrl = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = blobUrl;
-      a.download = `${song.replace(/[<>:"/\\|?*]/g, '_')}.mp4`;
+      a.download = `${song.replace(/[<>:"/\\|?*]/g, '_')}.MP3`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
