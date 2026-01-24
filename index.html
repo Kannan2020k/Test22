@@ -27,7 +27,7 @@ body{margin:0;font-family:'Varela Round',system-ui;background:var(--bg);color:va
 .quality-selector button{margin-left:5px;padding:5px 10px;border:none;background:var(--surface2);color:var(--text);cursor:pointer;border-radius:4px}
 .quality-selector button.active{background:var(--accent)}
 .list{display:flex;flex-direction:column;gap:10px}
-.card{display:flex;align-items:center;padding:10px;background:var(--surface2);border-radius:6px;cursor:pointer}
+.card{display:flex;align-items:center;padding:10px;background:var(--surface2);border-radius:6px;cursor:pointer;position:relative}
 .card img{width:50px;height:50px;border-radius:4px;margin-right:10px}
 .card-info{flex:1}
 .play-wrap{width:40px;height:40px;display:flex;align-items:center;justify-content:center;background:var(--accent);border-radius:50%;cursor:pointer}
@@ -40,6 +40,7 @@ body{margin:0;font-family:'Varela Round',system-ui;background:var(--bg);color:va
 .progress-content{background:var(--surface2);padding:20px;border-radius:6px;width:300px;text-align:center}
 .progress-bar-container{width:100%;height:10px;background:var(--surface);border-radius:5px;margin:10px 0}
 .progress-bar{width:0%;height:100%;background:var(--accent);border-radius:5px}
+.not-available{color:red;font-size:12px;margin-top:4px}
 </style>
 </head>
 
@@ -103,7 +104,7 @@ const playlistUrl = document.getElementById("playlistUrl");
 
 let currentSongKey = null;
 let currentCard = null;
-let selectedQuality = "320kbps";
+let selectedQuality = "160kbps";
 const saavnCache = {};
 
 // Only MP3
@@ -178,16 +179,29 @@ loadBtn.onclick = async ()=>{
       `;
       const playBtn = card.querySelector(".play-wrap");
       const icon = playBtn.querySelector(".material-icons");
+
+      // Check MP3 availability
+      const bestMP3 = getBestMP3(saavnCache[key], selectedQuality);
+      if(!bestMP3){
+        const label = document.createElement("div");
+        label.textContent = "MP3 not available";
+        label.className="not-available";
+        card.querySelector(".card-info").appendChild(label);
+      }
+
       playBtn.onclick = ()=>{
         const best = getBestMP3(saavnCache[key],selectedQuality);
-        if(!best || !best.url) return alert("MP3 not available for this track");
+        if(!best || !best.url){
+          alert("MP3 not available for this track");
+          return;
+        }
         player.src = best.url;
         player.play().catch(err=>console.error("Playback error:", err));
         icon.textContent="pause";
         if(currentCard) currentCard.classList.remove("playing");
         card.classList.add("playing");
-        currentCard=card;
-        currentSongKey=key;
+        currentCard = card;
+        currentSongKey = key;
         player.style.display="block";
       }
       tracksDiv.appendChild(card);
@@ -231,7 +245,7 @@ async function downloadAll(){
     done++;
     progressBar.style.width = `${(done/total)*100}%`;
     progressText.textContent = `${done} / ${total}`;
-    await new Promise(r=>setTimeout(r,100)); // small delay to keep UI responsive
+    await new Promise(r=>setTimeout(r,100)); // keep UI responsive
   }
 
   progressTitle.textContent="Download Complete!";
