@@ -2,44 +2,34 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<title>Playlist Downloader - MP3 Only</title>
+<title>MP3 Playlist Downloader</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
 <link href="https://fonts.googleapis.com/css2?family=Varela+Round&display=swap" rel="stylesheet">
 <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
 
 <style>
-:root{
-  --bg:#121212;
-  --surface:#1e1e1e;
-  --surface2:#242424;
-  --surfaceActive:#221a3d;
-  --text:#fff;
-  --sub:#b3b3b3;
-  --accent:#7C4DFF;
-}
-*{box-sizing:border-box}
-body{margin:0;font-family:'Varela Round',system-ui;background:var(--bg);color:var(--text)}
+body{margin:0;font-family:'Varela Round',system-ui;background:#121212;color:#fff}
 .container{max-width:900px;margin:auto;padding:20px 20px 180px}
 .header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}
 .header-title{font-size:24px;font-weight:bold}
-.header-sub{font-size:14px;color:var(--sub)}
-.quality-selector button{margin-left:5px;padding:5px 10px;border:none;background:var(--surface2);color:var(--text);cursor:pointer;border-radius:4px}
-.quality-selector button.active{background:var(--accent)}
+.header-sub{font-size:14px;color:#b3b3b3}
+.quality-selector button{margin-left:5px;padding:5px 10px;border:none;background:#242424;color:#fff;cursor:pointer;border-radius:4px}
+.quality-selector button.active{background:#7C4DFF}
 .list{display:flex;flex-direction:column;gap:10px}
-.card{display:flex;align-items:center;padding:10px;background:var(--surface2);border-radius:6px;cursor:pointer;position:relative}
+.card{display:flex;align-items:center;padding:10px;background:#242424;border-radius:6px;cursor:pointer;position:relative}
 .card img{width:50px;height:50px;border-radius:4px;margin-right:10px}
 .card-info{flex:1}
-.play-wrap{width:40px;height:40px;display:flex;align-items:center;justify-content:center;background:var(--accent);border-radius:50%;cursor:pointer}
-.download-all{position:fixed;bottom:20px;right:80px;background:var(--accent);color:#fff;border:none;padding:12px 16px;border-radius:50%;cursor:pointer;display:none}
-.fab{position:fixed;bottom:20px;right:20px;background:var(--accent);color:#fff;border:none;padding:12px 16px;border-radius:50%;cursor:pointer}
-.sheet{position:fixed;bottom:0;left:0;width:100%;background:var(--surface);padding:20px;transform:translateY(100%);transition:0.3s}
+.play-wrap{width:40px;height:40px;display:flex;align-items:center;justify-content:center;background:#7C4DFF;border-radius:50%;cursor:pointer}
+.download-all{position:fixed;bottom:20px;right:80px;background:#7C4DFF;color:#fff;border:none;padding:12px 16px;border-radius:50%;cursor:pointer;display:none}
+.fab{position:fixed;bottom:20px;right:20px;background:#7C4DFF;color:#fff;border:none;padding:12px 16px;border-radius:50%;cursor:pointer}
+.sheet{position:fixed;bottom:0;left:0;width:100%;background:#1e1e1e;padding:20px;transform:translateY(100%);transition:0.3s}
 .sheet.open{transform:translateY(0)}
 .progress-modal{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;display:none}
 .progress-modal.show{display:flex}
-.progress-content{background:var(--surface2);padding:20px;border-radius:6px;width:300px;text-align:center}
-.progress-bar-container{width:100%;height:10px;background:var(--surface);border-radius:5px;margin:10px 0}
-.progress-bar{width:0%;height:100%;background:var(--accent);border-radius:5px}
+.progress-content{background:#242424;padding:20px;border-radius:6px;width:300px;text-align:center}
+.progress-bar-container{width:100%;height:10px;background:#1e1e1e;border-radius:5px;margin:10px 0}
+.progress-bar{width:0%;height:100%;background:#7C4DFF;border-radius:5px}
 .not-available{color:red;font-size:12px;margin-top:4px}
 </style>
 </head>
@@ -104,17 +94,22 @@ const playlistUrl = document.getElementById("playlistUrl");
 
 let currentSongKey = null;
 let currentCard = null;
-let selectedQuality = "160kbps";
+let selectedQuality = "320kbps";
 const saavnCache = {};
 
 // Only MP3 strictly
 function getBestMP3(urls, preferred){
   if(!Array.isArray(urls)) return null;
-  const mp3Urls = urls.filter(u => u && u.url && u.url.endsWith(".mp3"));
-  if(mp3Urls.length === 0) return null;
+  const mp3Urls = urls.filter(u=>u && u.url && u.url.endsWith(".mp3"));
+  if(mp3Urls.length===0) return null;
   const order = ["96kbps","160kbps","320kbps"];
   const sorted = mp3Urls.sort((a,b)=>order.indexOf(b.quality)-order.indexOf(a.quality));
   return sorted.find(u=>u.quality===preferred) || sorted[0] || null;
+}
+
+// Safe clean file name
+function cleanFileName(name){
+  return name.replace(/[<>:"/\\|?*]/g,"_").trim();
 }
 
 document.querySelectorAll(".quality-btn").forEach(btn=>{
@@ -159,7 +154,6 @@ loadBtn.onclick = async ()=>{
     trackCount.textContent = `${tracks.length} tracks`;
 
     await Promise.all(tracks.map(t=>prefetchSaavn(`${t.title} ${t.artists}`)));
-
     downloadBtn.style.display="flex";
 
     tracks.forEach(t=>{
@@ -183,7 +177,7 @@ loadBtn.onclick = async ()=>{
       const bestMP3 = getBestMP3(saavnCache[key], selectedQuality);
       if(!bestMP3){
         const label = document.createElement("div");
-        label.textContent = "MP3 not available";
+        label.textContent="MP3 not available";
         label.className="not-available";
         card.querySelector(".card-info").appendChild(label);
       }
@@ -195,7 +189,7 @@ loadBtn.onclick = async ()=>{
           return;
         }
         player.src = best.url;
-        player.play().catch(err=>console.error("Playback error:", err));
+        player.play().catch(err=>console.error(err));
         icon.textContent="pause";
         if(currentCard) currentCard.classList.remove("playing");
         card.classList.add("playing");
@@ -203,6 +197,7 @@ loadBtn.onclick = async ()=>{
         currentSongKey = key;
         player.style.display="block";
       }
+
       tracksDiv.appendChild(card);
     });
   }catch(e){
@@ -211,6 +206,7 @@ loadBtn.onclick = async ()=>{
   }
 };
 
+// Download function
 async function downloadSong(song, urls){
   const best = getBestMP3(urls, selectedQuality);
   if(!best || !best.url) return false;
@@ -219,15 +215,12 @@ async function downloadSong(song, urls){
     const blob = await res.blob();
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = `${song.replace(/[<>:"/\\|?*]/g,"_")}.mp3`;
+    a.download = cleanFileName(song) + ".mp3"; // Clean name + mp3 extension
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     return true;
-  }catch(e){
-    console.error("Download failed for:", song, e);
-    return false;
-  }
+  }catch(e){ console.error(e); return false; }
 }
 
 async function downloadAll(){
@@ -244,7 +237,7 @@ async function downloadAll(){
     done++;
     progressBar.style.width = `${(done/total)*100}%`;
     progressText.textContent = `${done} / ${total}`;
-    await new Promise(r=>setTimeout(r,100));
+    await new Promise(r=>setTimeout(r,50));
   }
 
   progressTitle.textContent="Download Complete!";
