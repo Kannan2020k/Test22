@@ -82,7 +82,7 @@ body{margin:0;font-family:'Varela Round',system-ui;background:var(--bg);color:va
   </div>
 </div>
 
-<audio id="player"></audio>
+<audio id="player" controls style="width:100%;display:none;margin-top:20px;"></audio>
 
 <script>
 const SPOTIFY_API = "https://spotify-api-6yog.vercel.app/api/scrape";
@@ -109,11 +109,8 @@ const saavnCache = {};
 // Only MP3
 function getBestMP3(urls, preferred){
   if(!Array.isArray(urls)) return null;
-
-  // filter MP3 only
   const mp3Urls = urls.filter(u => u && u.url && u.url.endsWith(".mp3"));
   if(mp3Urls.length === 0) return null;
-
   const order = ["96kbps","160kbps","320kbps"];
   const sorted = mp3Urls.sort((a,b)=>order.indexOf(b.quality)-order.indexOf(a.quality));
   return sorted.find(u=>u.quality===preferred) || sorted[0] || null;
@@ -137,92 +134,111 @@ function getPlaylistId(url){
 }
 
 async function prefetchSaavn(key){
-  const res = await fetch(`${SAAVN_API}?query=${encodeURIComponent(key)}&limit=1`);
-  const json = await res.json();
-  saavnCache[key] = json?.data?.results?.[0]?.downloadUrl || [];
+  try{
+    const res = await fetch(`${SAAVN_API}?query=${encodeURIComponent(key)}&limit=1`);
+    const json = await res.json();
+    saavnCache[key] = json?.data?.results?.[0]?.downloadUrl || [];
+  }catch(e){
+    console.error("Saavn fetch error:", key, e);
+    saavnCache[key] = [];
+  }
 }
 
 loadBtn.onclick = async ()=>{
   const id = getPlaylistId(playlistUrl.value.trim());
-  if(!id) return;
+  if(!id) return alert("Invalid playlist URL");
   sheet.classList.remove("open");
   tracksDiv.innerHTML="";
   downloadBtn.style.display="none";
 
-  const res = await fetch(`${SPOTIFY_API}?playlist=${id}`);
-  const data = await res.json();
-  const tracks = data.tracks.filter(t=>t.title && t.artists);
-  trackCount.textContent = `${tracks.length} tracks`;
+  try{
+    const res = await fetch(`${SPOTIFY_API}?playlist=${id}`);
+    const data = await res.json();
+    const tracks = data.tracks.filter(t=>t.title && t.artists);
+    trackCount.textContent = `${tracks.length} tracks`;
 
-  await Promise.all(tracks.map(t=>prefetchSaavn(`${t.title} ${t.artists}`)));
+    await Promise.all(tracks.map(t=>prefetchSaavn(`${t.title} ${t.artists}`)));
 
-  downloadBtn.style.display="flex";
+    downloadBtn.style.display="flex";
 
-  tracks.forEach(t=>{
-    const key = `${t.title} ${t.artists}`;
-    const card = document.createElement("div");
-    card.className="card";
-    card.dataset.key=key;
-    card.innerHTML=`
-      <img src="${t.image}">
-      <div class="card-info">
-        <div class="title">${t.title}</div>
-        <div class="meta">${t.artists}</div>
-      </div>
-      <div class="play-wrap">
-        <span class="material-icons">play_arrow</span>
-      </div>
-    `;
-    const playBtn = card.querySelector(".play-wrap");
-    const icon = playBtn.querySelector(".material-icons");
-    playBtn.onclick = ()=>{
-      const best = getBestMP3(saavnCache[key],selectedQuality);
-      if(!best) return;
-      if(currentCard){
-        currentCard.classList.remove("playing");
-        currentCard.querySelector(".material-icons").textContent="play_arrow";
+    tracks.forEach(t=>{
+      const key = `${t.title} ${t.artists}`;
+      const card = document.createElement("div");
+      card.className="card";
+      card.dataset.key=key;
+      card.innerHTML=`
+        <img src="${t.image}">
+        <div class="card-info">
+          <div class="title">${t.title}</div>
+          <div class="meta">${t.artists}</div>
+        </div>
+        <div class="play-wrap">
+          <span class="material-icons">play_arrow</span>
+        </div>
+      `;
+      const playBtn = card.querySelector(".play-wrap");
+      const icon = playBtn.querySelector(".material-icons");
+      playBtn.onclick = ()=>{
+        const best = getBestMP3(saavnCache[key],selectedQuality);
+        if(!best || !best.url) return alert("MP3 not available for this track");
+        player.src = best.url;
+        player.play().catch(err=>console.error("Playback error:", err));
+        icon.textContent="pause";
+        if(currentCard) currentCard.classList.remove("playing");
+        card.classList.add("playing");
+        currentCard=card;
+        currentSongKey=key;
+        player.style.display="block";
       }
-      player.src=best.url;
-      player.play();
-      icon.textContent="pause";
-      card.classList.add("playing");
-      currentCard=card;
-      currentSongKey=key;
-    }
-    tracksDiv.appendChild(card);
-  });
+      tracksDiv.appendChild(card);
+    });
+  }catch(e){
+    alert("Failed to load playlist");
+    console.error(e);
+  }
 };
 
-downloadBtn.onclick = async ()=>{
-  const songs = Object.entries(saavnCache);
-  const total = songs.length;
-  let done=0;
-
-  progressModal.classList.add("show");
-  progressBar.style.width="0%";
-  progressText.textContent=`0 / ${total}`;
-
-  for(const [song, urls] of songs){
-    const best = getBestMP3(urls,selectedQuality);
-    if(!best){ done++; continue; }
-
+async function downloadSong(song, urls){
+  const best = getBestMP3(urls, selectedQuality);
+  if(!best || !best.url) return false;
+  try{
     const res = await fetch(best.url);
     const blob = await res.blob();
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = `${song.replace(/[<>:"/\\|?*]/g,"_")}.mp3`; 
+    a.download = `${song.replace(/[<>:"/\\|?*]/g,"_")}.mp3`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
+    return true;
+  }catch(e){
+    console.error("Download failed for:", song, e);
+    return false;
+  }
+}
 
+async function downloadAll(){
+  const songs = Object.entries(saavnCache);
+  const total = songs.length;
+  let done = 0;
+  progressModal.classList.add("show");
+  progressBar.style.width="0%";
+  progressText.textContent=`0 / ${total}`;
+  progressTitle.textContent="Downloading Songs...";
+
+  for(const [song, urls] of songs){
+    await downloadSong(song, urls);
     done++;
     progressBar.style.width = `${(done/total)*100}%`;
     progressText.textContent = `${done} / ${total}`;
-    await new Promise(r=>setTimeout(r,300));
+    await new Promise(r=>setTimeout(r,100)); // small delay to keep UI responsive
   }
 
   progressTitle.textContent="Download Complete!";
-};
+  setTimeout(()=>progressModal.classList.remove("show"),1000);
+}
+
+downloadBtn.onclick = downloadAll;
 </script>
 </body>
 </html>
