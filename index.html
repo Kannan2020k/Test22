@@ -107,7 +107,7 @@ let currentCard = null;
 let selectedQuality = "160kbps";
 const saavnCache = {};
 
-// Only MP3
+// Only MP3 strictly
 function getBestMP3(urls, preferred){
   if(!Array.isArray(urls)) return null;
   const mp3Urls = urls.filter(u => u && u.url && u.url.endsWith(".mp3"));
@@ -180,7 +180,6 @@ loadBtn.onclick = async ()=>{
       const playBtn = card.querySelector(".play-wrap");
       const icon = playBtn.querySelector(".material-icons");
 
-      // Check MP3 availability
       const bestMP3 = getBestMP3(saavnCache[key], selectedQuality);
       if(!bestMP3){
         const label = document.createElement("div");
@@ -245,7 +244,7 @@ async function downloadAll(){
     done++;
     progressBar.style.width = `${(done/total)*100}%`;
     progressText.textContent = `${done} / ${total}`;
-    await new Promise(r=>setTimeout(r,100)); // keep UI responsive
+    await new Promise(r=>setTimeout(r,100));
   }
 
   progressTitle.textContent="Download Complete!";
