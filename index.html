@@ -133,7 +133,7 @@ const playlistUrl = document.getElementById("playlistUrl");
 
 let currentSongKey = null;
 let currentCard = null;
-let selectedQuality = "320kbps";
+let selectedQuality = "160kbps";
 const saavnCache = {};
 
 // Utility: Get best quality track
@@ -245,66 +245,69 @@ loadBtn.onclick = async () => {
 
     // Get best URL and file size
     const best = getBestQuality(saavnCache[key], selectedQuality);
+
     if(best && best.url){
       const size = await getFileSize(best.url);
       sizeLabel.textContent = formatBytes(size);
       if(size && size > 10 * 1024 * 1024){
-        sizeLabel.style.color = "red"; // red mark for large files
+        sizeLabel.style.color = "red";
       }
+
+      // Play button
+      playBtn.onclick = () => {
+        if(currentSongKey === key && !player.paused){
+          player.pause();
+          icon.textContent = "play_arrow";
+          card.classList.remove("playing");
+          currentCard = null;
+          return;
+        }
+
+        if(currentCard){
+          currentCard.classList.remove("playing");
+          currentCard.querySelector(".material-icons").textContent = "play_arrow";
+        }
+
+        player.src = best.url;
+        player.play();
+
+        icon.textContent = "pause";
+        card.classList.add("playing");
+
+        currentCard = card;
+        currentSongKey = key;
+      };
+
+      // Download button
+      downloadBtn.onclick = async (e) => {
+        e.stopPropagation();
+
+        progressModal.classList.add("show");
+        progressBar.style.width = "0%";
+        progressText.textContent = `1 / 1`;
+        progressTitle.textContent = `Downloading ${t.title}...`;
+
+        const res = await fetch(best.url);
+        const blob = await res.blob();
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = `${key.replace(/[<>:"/\\|?*]/g,"_")}.m4a`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+
+        progressBar.style.width = `100%`;
+        setTimeout(()=>progressModal.classList.remove("show"), 500);
+      };
+
     } else {
       sizeLabel.textContent = "Not available";
+      sizeLabel.style.color = "#ff5555";
+      playBtn.style.cursor = "not-allowed";
+      downloadBtn.style.cursor = "not-allowed";
+      playBtn.onclick = null;
+      downloadBtn.onclick = null;
     }
-
-    // Play button
-    playBtn.onclick = () => {
-      if(!best) return;
-
-      // Pause toggle
-      if(currentSongKey === key && !player.paused){
-        player.pause();
-        icon.textContent = "play_arrow";
-        card.classList.remove("playing");
-        currentCard = null;
-        return;
-      }
-
-      if(currentCard){
-        currentCard.classList.remove("playing");
-        currentCard.querySelector(".material-icons").textContent = "play_arrow";
-      }
-
-      player.src = best.url;
-      player.play();
-
-      icon.textContent = "pause";
-      card.classList.add("playing");
-
-      currentCard = card;
-      currentSongKey = key;
-    };
-
-    // Download button
-    downloadBtn.onclick = async (e) => {
-      e.stopPropagation();
-      if(!best) return;
-
-      progressModal.classList.add("show");
-      progressBar.style.width = "0%";
-      progressText.textContent = `1 / 1`;
-      progressTitle.textContent = `Downloading ${t.title}...`;
-
-      const res = await fetch(best.url);
-      const blob = await res.blob();
-      const a = document.createElement("a");
-      a.href = URL.createObjectURL(blob);
-      a.download = `${key.replace(/[<>:"/\\|?*]/g,"_")}.m4a`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-
-      progressBar.style.width = `100%`;
-      setTimeout(()=>progressModal.classList.remove("show"), 500);
-    };
 
     tracksDiv.appendChild(card);
   });
