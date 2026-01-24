@@ -61,7 +61,7 @@ body{margin:0;font-family:'Varela Round',system-ui;background:var(--bg);color:va
 .download-all{position:fixed;bottom:100px;right:20px;padding:14px 18px;border-radius:25px;background:linear-gradient(45deg,#7C4DFF,#985eff);color:#fff;border:none;cursor:pointer;font-size:16px;box-shadow:0 6px 18px var(--shadow);display:none;transition:0.3s;}
 .download-all:hover{transform:scale(1.05);}
 
-/* === MOBILE RESPONSIVE === */
+/* MOBILE RESPONSIVE */
 @media (max-width:600px){
   .header{flex-direction:column;align-items:flex-start;}
   .header-title{font-size:1.8rem;}
@@ -78,7 +78,6 @@ body{margin:0;font-family:'Varela Round',system-ui;background:var(--bg);color:va
 </head>
 
 <body>
-
 <div class="container">
   <div class="header">
     <div>
@@ -164,10 +163,8 @@ document.querySelectorAll(".quality-btn").forEach(btn => {
 fab.onclick = () => sheet.classList.add("open");
 
 function getPlaylistId(url){
-  try{
-    const u = new URL(url);
-    return u.pathname.split("/playlist/")[1]?.split("/")[0];
-  }catch{return null;}
+  try{ const u = new URL(url); return u.pathname.split("/playlist/")[1]?.split("/")[0]; }
+  catch{return null;}
 }
 
 async function prefetchSaavn(key){
@@ -188,19 +185,22 @@ loadBtn.onclick = async () => {
 
   const res = await fetch(`${SPOTIFY_API}?playlist=${id}`);
   const data = await res.json();
-
   const tracks = data.tracks.filter(t => t.title && t.artists);
   trackCount.textContent = `${tracks.length} tracks`;
 
   await Promise.all(tracks.map(t => prefetchSaavn(`${t.title} ${t.artists}`)));
 
+  // calculate total playlist size
+  let totalSize = 0;
+  Object.values(saavnCache).forEach(v => { if(v[0]?.size) totalSize += v[0].size; });
+  const totalSizeText = totalSize ? ` (${formatBytes(totalSize)})` : "";
+  downloadAllBtn.textContent = `Download All${totalSizeText}`;
   downloadAllBtn.style.display = "block";
 
   tracks.forEach((t) => {
     const key = `${t.title} ${t.artists}`;
     const card = document.createElement("div");
     card.className = "card";
-
     const sizeText = saavnCache[key][0]?.size ? formatBytes(saavnCache[key][0].size) : "";
 
     card.innerHTML = `
