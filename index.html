@@ -36,7 +36,6 @@ body{margin:0;font-family:'Varela Round',system-ui;background:var(--bg);color:va
 .card-info{flex:1;display:flex;flex-direction:column;overflow:hidden}
 .card-info .title{font-weight:bold;font-size:1rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .card-info .meta{font-size:0.8rem;color:var(--sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.card-info .size{font-size:0.75rem;color:var(--sub);margin-top:2px;}
 .play-wrap, .download-wrap{display:flex;align-items:center;justify-content:center;width:44px;height:44px;border-radius:50%;cursor:pointer;transition:0.3s, transform 0.2s;font-size:20px;}
 .play-wrap{background:var(--accent);color:#fff;}
 .download-wrap{background:var(--accentLight);color:#fff;margin-left:5px;}
@@ -61,7 +60,6 @@ body{margin:0;font-family:'Varela Round',system-ui;background:var(--bg);color:va
 .download-all{position:fixed;bottom:100px;right:20px;padding:14px 18px;border-radius:25px;background:linear-gradient(45deg,#7C4DFF,#985eff);color:#fff;border:none;cursor:pointer;font-size:16px;box-shadow:0 6px 18px var(--shadow);display:none;transition:0.3s;}
 .download-all:hover{transform:scale(1.05);}
 
-/* MOBILE RESPONSIVE */
 @media (max-width:600px){
   .header{flex-direction:column;align-items:flex-start;}
   .header-title{font-size:1.8rem;}
@@ -70,7 +68,6 @@ body{margin:0;font-family:'Varela Round',system-ui;background:var(--bg);color:va
   .card img{width:50px;height:50px;}
   .card-info .title{font-size:0.95rem;}
   .card-info .meta{font-size:0.75rem;}
-  .card-info .size{font-size:0.7rem;}
   .play-wrap, .download-wrap{width:40px;height:40px;font-size:18px;}
   .fab{width:55px;height:55px;font-size:26px;}
 }
@@ -88,6 +85,200 @@ body{margin:0;font-family:'Varela Round',system-ui;background:var(--bg);color:va
       <button class="quality-btn" data-quality="96kbps">96</button>
       <button class="quality-btn active" data-quality="160kbps">160</button>
       <button class="quality-btn" data-quality="320kbps">320</button>
+    </div>
+  </div>
+
+  <div class="list" id="tracks"></div>
+</div>
+
+<button class="download-all" id="downloadAll">Download All</button>
+<button class="fab" id="fab">+</button>
+
+<div class="sheet" id="sheet">
+  <input id="playlistUrl" placeholder="Paste Spotify playlist URL">
+  <button id="loadBtn">Load</button>
+</div>
+
+<div class="progress-modal" id="progressModal">
+  <div class="progress-content">
+    <div class="progress-title" id="progressTitle">Downloading Songs...</div>
+    <div class="progress-bar-container">
+      <div class="progress-bar" id="progressBar"></div>
+    </div>
+    <div class="progress-text" id="progressText">0 / 0</div>
+  </div>
+</div>
+
+<audio id="player"></audio>
+
+<script>
+const SPOTIFY_API = "https://spotify-api-6yog.vercel.app/api/scrape";
+const SAAVN_API = "https://jiosavan-api-with-playlist.vercel.app/api/search/songs";
+
+const tracksDiv = document.getElementById("tracks");
+const trackCount = document.getElementById("trackCount");
+const player = document.getElementById("player");
+const progressModal = document.getElementById("progressModal");
+const progressBar = document.getElementById("progressBar");
+const progressText = document.getElementById("progressText");
+const progressTitle = document.getElementById("progressTitle");
+const fab = document.getElementById("fab");
+const sheet = document.getElementById("sheet");
+const loadBtn = document.getElementById("loadBtn");
+const playlistUrl = document.getElementById("playlistUrl");
+const downloadAllBtn = document.getElementById("downloadAll");
+
+let currentSongKey = null;
+let currentCard = null;
+let selectedQuality = "160kbps";
+const saavnCache = {};
+
+function getBestQuality(urls, preferred) {
+  if (!Array.isArray(urls)) return null;
+  const order = ["96kbps", "160kbps", "320kbps"];
+  const sorted = urls
+    .filter(u => u && u.url && order.includes(u.quality))
+    .sort((a, b) => order.indexOf(b.quality) - order.indexOf(a.quality));
+  return sorted.find(u => u.quality === preferred) || sorted[0] || null;
+}
+
+document.querySelectorAll(".quality-btn").forEach(btn => {
+  btn.onclick = () => {
+    document.querySelectorAll(".quality-btn").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    selectedQuality = btn.dataset.quality;
+  };
+});
+
+fab.onclick = () => sheet.classList.add("open");
+
+function getPlaylistId(url){
+  try{ const u = new URL(url); return u.pathname.split("/playlist/")[1]?.split("/")[0]; }
+  catch{return null;}
+}
+
+async function prefetchSaavn(key){
+  const res = await fetch(`${SAAVN_API}?query=${encodeURIComponent(key)}&limit=1`);
+  const json = await res.json();
+  saavnCache[key] = json?.data?.results?.[0]?.downloadUrl || [];
+}
+
+loadBtn.onclick = async () => {
+  const id = getPlaylistId(playlistUrl.value.trim());
+  if(!id) return;
+
+  sheet.classList.remove("open");
+  tracksDiv.innerHTML = "";
+  downloadAllBtn.style.display = "none";
+  trackCount.textContent = "Loading...";
+
+  const res = await fetch(`${SPOTIFY_API}?playlist=${id}`);
+  const data = await res.json();
+  const tracks = data.tracks.filter(t => t.title && t.artists);
+  trackCount.textContent = `${tracks.length} tracks`;
+
+  await Promise.all(tracks.map(t => prefetchSaavn(`${t.title} ${t.artists}`)));
+
+  downloadAllBtn.style.display = "block";
+
+  tracks.forEach((t) => {
+    const key = `${t.title} ${t.artists}`;
+    const card = document.createElement("div");
+    card.className = "card";
+
+    card.innerHTML = `
+      <img src="${t.image}">
+      <div class="card-info">
+        <div class="title">${t.title}</div>
+        <div class="meta">${t.artists}</div>
+      </div>
+      <div class="play-wrap"><span class="material-icons">play_arrow</span></div>
+      <div class="download-wrap"><span class="material-icons">download</span></div>
+    `;
+
+    const playBtn = card.querySelector(".play-wrap");
+    const icon = playBtn.querySelector(".material-icons");
+    const downloadBtn = card.querySelector(".download-wrap");
+
+    playBtn.onclick = () => {
+      const best = getBestQuality(saavnCache[key], selectedQuality);
+      if(!best) return;
+      if(currentCard){
+        currentCard.classList.remove("playing");
+        currentCard.querySelector(".material-icons").textContent = "play_arrow";
+      }
+      player.src = best.url;
+      player.play();
+      icon.textContent = "pause";
+      card.classList.add("playing");
+      currentCard = card;
+      currentSongKey = key;
+    };
+
+    downloadBtn.onclick = async (e) => {
+      e.stopPropagation();
+      await downloadSong(key);
+    };
+
+    tracksDiv.appendChild(card);
+  });
+};
+
+async function downloadSong(key){
+  const urls = saavnCache[key];
+  const best = getBestQuality(urls, selectedQuality);
+  if(!best) return;
+
+  progressModal.classList.add("show");
+  progressTitle.textContent = `Downloading ${key}...`;
+  progressText.textContent = `1 / 1`;
+  progressBar.style.width = "100%";
+
+  const res = await fetch(best.url);
+  const blob = await res.blob();
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `${key.replace(/[<>:"/\\|?*]/g,"_")}.m4a`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+
+  setTimeout(()=>progressModal.classList.remove("show"),500);
+}
+
+downloadAllBtn.onclick = async () => {
+  const songs = Object.entries(saavnCache);
+  const total = songs.length;
+  let done = 0;
+
+  progressModal.classList.add("show");
+  progressBar.style.width = "0%";
+  progressText.textContent = `0 / ${total}`;
+  progressTitle.textContent = "Downloading All Songs...";
+
+  for(const [song, urls] of songs){
+    const best = getBestQuality(urls, selectedQuality);
+    if(!best){ done++; continue; }
+
+    const res = await fetch(best.url);
+    const blob = await res.blob();
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `${song.replace(/[<>:"/\\|?*]/g,"_")}.m4a`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+
+    done++;
+    progressBar.style.width = `${(done/total)*100}%`;
+    progressText.textContent = `${done} / ${total}`;
+    await new Promise(r => setTimeout(r, 300));
+  }
+  progressTitle.textContent = "Download Complete!";
+};
+</script>
+</body>
+</html>
     </div>
   </div>
 
