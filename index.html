@@ -18,6 +18,13 @@ body{margin:0;background:#121212;color:#fff;font-family:'Varela Round'}
 .search{width:100%;padding:10px;margin:15px 0;border-radius:25px;
 border:1px solid #333;background:#1e1e1e;color:#fff;font-size:1rem}
 
+.loader{
+  display:none;margin:20px auto;width:40px;height:40px;
+  border:4px solid #333;border-top:4px solid #7C4DFF;
+  border-radius:50%;animation:spin 1s linear infinite;
+}
+@keyframes spin{0%{transform:rotate(0deg);}100%{transform:rotate(360deg);}}
+
 .card{display:flex;gap:12px;padding:12px;background:#242424;border-radius:14px;
 margin-bottom:12px;align-items:center;transition:.3s;cursor:pointer}
 .card:hover{background:#2b2b2b}
@@ -26,6 +33,7 @@ margin-bottom:12px;align-items:center;transition:.3s;cursor:pointer}
 .card img{width:60px;height:60px;border-radius:12px;object-fit:cover}
 .card-info{flex:1;overflow:hidden}
 .title{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:bold}
+.title mark{background:yellow;color:#000;padding:0 2px;border-radius:2px;}
 .meta{font-size:.8rem;color:#aaa}
 .actions{display:flex;gap:10px}
 .actions span{cursor:pointer;color:#7C4DFF}
@@ -79,6 +87,7 @@ margin-bottom:15px;font-weight:bold;color:#7C4DFF;font-size:1rem
   </div>
 
   <input class="search" id="search" placeholder="Search by song title">
+  <div class="loader" id="loader"></div>
   <div id="tracks"></div>
 </div>
 
@@ -105,6 +114,7 @@ const SAAVN_API="https://jiosavan-api-with-playlist.vercel.app/api/search/songs"
 
 const tracksDiv=document.getElementById("tracks");
 const player=document.getElementById("player");
+const loader=document.getElementById("loader");
 const saavnCache={};
 
 let quality="320kbps";
@@ -136,17 +146,26 @@ async function prefetch(key){
   saavnCache[key]=j?.data?.results?.[0]?.downloadUrl||[];
 }
 
+function highlight(text, term){
+  if(!term) return text;
+  const re=new RegExp(`(${term})`,"gi");
+  return text.replace(re,"<mark>$1</mark>");
+}
+
 loadBtn.onclick=async()=>{
   const url = playlistUrl.value.trim();
   if(!url) return;
   const id=new URL(url).pathname.split("/playlist/")[1];
 
   sheet.classList.remove("open");
-  tracksDiv.innerHTML="<div class='load-msg'>Loading playlist...</div>";
+  tracksDiv.innerHTML="";
   document.getElementById("downloadAll").style.display="none";
+  loader.style.display="block";
 
   const r=await fetch(`${SPOTIFY_API}?playlist=${id}`);
   const j=await r.json();
+  loader.style.display="none";
+
   tracksDiv.innerHTML="";
   document.getElementById("trackCount").textContent=j.tracks.length+" tracks";
 
@@ -156,7 +175,7 @@ loadBtn.onclick=async()=>{
 
     const c=document.createElement("div");
     c.className="card";
-    c.dataset.search=t.title.toLowerCase(); // ONLY song title for search
+    c.dataset.search=t.title.toLowerCase();
 
     c.innerHTML=`
       <img src="${t.image}">
@@ -177,13 +196,8 @@ loadBtn.onclick=async()=>{
       if(!best) return;
 
       if(currentKey===key){
-        if(player.paused){
-          player.play();
-          playBtn.textContent="pause";
-        }else{
-          player.pause();
-          playBtn.textContent="play_arrow";
-        }
+        if(player.paused){ player.play(); playBtn.textContent="pause"; }
+        else{ player.pause(); playBtn.textContent="play_arrow"; }
         return;
       }
 
@@ -225,9 +239,15 @@ player.onended=()=>{
 document.getElementById("search").oninput=e=>{
   const q=e.target.value.toLowerCase().trim();
   document.querySelectorAll(".card").forEach(c=>{
-    c.style.display=c.dataset.search.includes(q)?"flex":"none";
+    const title=c.querySelector(".title").textContent;
+    if(title.toLowerCase().includes(q)){
+      c.style.display="flex";
+      c.querySelector(".title").innerHTML=highlight(title,q);
+    }else{
+      c.style.display="none";
+    }
   });
-};
+});
 
 const downloadAll=document.getElementById("downloadAll");
 const progress=document.getElementById("progress");
