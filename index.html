@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Spotify Playlist Downloader</title>
+<title>Playlist Downloader</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <link href="https://fonts.googleapis.com/css2?family=Varela+Round&display=swap" rel="stylesheet">
@@ -10,20 +10,22 @@
 
 <style>
 body{margin:0;background:#121212;color:#fff;font-family:'Varela Round'}
-.container{max-width:900px;margin:auto;padding:20px 20px 160px}
-.header{display:flex;justify-content:space-between;align-items:center}
-.header-title{font-size:2rem;color:#7C4DFF}
-.header-sub{font-size:.9rem;color:#aaa}
-.search{width:100%;margin:15px 0;padding:10px;border-radius:20px;
-background:#1e1e1e;border:1px solid #333;color:#fff}
+.container{max-width:900px;margin:auto;padding:20px 20px 180px}
+.header{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap}
+.header-title{font-size:2rem;color:#7C4DFF;font-weight:bold}
+.header-sub{font-size:.9rem;color:#aaa;margin-top:5px}
 
-.card{display:flex;gap:12px;padding:12px;background:#242424;
-border-radius:14px;margin-bottom:10px;align-items:center}
+.search{width:100%;padding:10px;margin:15px 0;border-radius:25px;
+border:1px solid #333;background:#1e1e1e;color:#fff;font-size:1rem}
+
+.card{display:flex;gap:12px;padding:12px;background:#242424;border-radius:14px;
+margin-bottom:12px;align-items:center;transition:.3s;cursor:pointer}
+.card:hover{background:#2b2b2b}
 .card.playing{outline:2px solid #7C4DFF}
 
-.card img{width:55px;height:55px;border-radius:10px}
+.card img{width:60px;height:60px;border-radius:12px;object-fit:cover}
 .card-info{flex:1;overflow:hidden}
-.title{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.title{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:bold}
 .meta{font-size:.8rem;color:#aaa}
 .actions{display:flex;gap:10px}
 .actions span{cursor:pointer;color:#7C4DFF}
@@ -41,7 +43,7 @@ border:none;color:#fff;font-size:28px;cursor:pointer
 .download-all{bottom:90px;display:none}
 
 .sheet{position:fixed;bottom:0;left:0;width:100%;background:#1e1e1e;
-padding:20px;transform:translateY(100%);transition:.3s}
+padding:25px;transform:translateY(100%);transition:.3s;border-radius:20px 20px 0 0}
 .sheet.open{transform:translateY(0)}
 .sheet input,.sheet button{
 width:100%;padding:12px;border-radius:25px;border:none;margin-bottom:10px
@@ -53,6 +55,11 @@ display:none;align-items:center;justify-content:center}
 .box{background:#222;padding:20px;border-radius:20px;width:300px;text-align:center}
 .bar{height:10px;background:#333;border-radius:6px;overflow:hidden}
 .bar div{height:100%;width:0;background:linear-gradient(90deg,#7C4DFF,#9a6bff)}
+
+.load-msg{
+text-align:center;padding:20px;background:#1e1e1e;border-radius:14px;
+margin-bottom:15px;font-weight:bold;color:#7C4DFF;font-size:1rem
+}
 </style>
 </head>
 
@@ -61,7 +68,7 @@ display:none;align-items:center;justify-content:center}
 <div class="container">
   <div class="header">
     <div>
-      <div class="header-title">Spotify Playlist Downloader</div>
+      <div class="header-title">Playlist Downloader</div>
       <div class="header-sub" id="trackCount">No playlist loaded</div>
     </div>
     <div>
@@ -71,7 +78,7 @@ display:none;align-items:center;justify-content:center}
     </div>
   </div>
 
-  <input class="search" id="search" placeholder="Search in playlist">
+  <input class="search" id="search" placeholder="Search by song title">
   <div id="tracks"></div>
 </div>
 
@@ -113,6 +120,8 @@ document.querySelectorAll(".quality-btn").forEach(b=>{
   };
 });
 
+const fab=document.getElementById("fab");
+const sheet=document.getElementById("sheet");
 fab.onclick=()=>sheet.classList.add("open");
 
 function getBest(urls){
@@ -128,14 +137,17 @@ async function prefetch(key){
 }
 
 loadBtn.onclick=async()=>{
-  const id=new URL(playlistUrl.value).pathname.split("/playlist/")[1];
+  const url = playlistUrl.value.trim();
+  if(!url) return;
+  const id=new URL(url).pathname.split("/playlist/")[1];
+
   sheet.classList.remove("open");
-  tracksDiv.innerHTML="";
-  document.getElementById("downloadAll").style.display="block";
+  tracksDiv.innerHTML="<div class='load-msg'>Loading playlist...</div>";
+  document.getElementById("downloadAll").style.display="none";
 
   const r=await fetch(`${SPOTIFY_API}?playlist=${id}`);
   const j=await r.json();
-
+  tracksDiv.innerHTML="";
   document.getElementById("trackCount").textContent=j.tracks.length+" tracks";
 
   for(const t of j.tracks){
@@ -144,7 +156,7 @@ loadBtn.onclick=async()=>{
 
     const c=document.createElement("div");
     c.className="card";
-    c.dataset.search=key.toLowerCase();
+    c.dataset.search=t.title.toLowerCase(); // ONLY song title for search
 
     c.innerHTML=`
       <img src="${t.image}">
@@ -160,7 +172,6 @@ loadBtn.onclick=async()=>{
     tracksDiv.appendChild(c);
 
     const playBtn=c.querySelector(".play");
-
     playBtn.onclick=()=>{
       const best=getBest(saavnCache[key]);
       if(!best) return;
@@ -192,6 +203,7 @@ loadBtn.onclick=async()=>{
 
     c.querySelector(".down").onclick=async()=>{
       const best=getBest(saavnCache[key]);
+      if(!best) return;
       const b=await (await fetch(best.url)).blob();
       const a=document.createElement("a");
       a.href=URL.createObjectURL(b);
@@ -199,6 +211,8 @@ loadBtn.onclick=async()=>{
       a.click();
     };
   }
+
+  document.getElementById("downloadAll").style.display="block";
 };
 
 player.onended=()=>{
@@ -214,6 +228,11 @@ document.getElementById("search").oninput=e=>{
     c.style.display=c.dataset.search.includes(q)?"flex":"none";
   });
 };
+
+const downloadAll=document.getElementById("downloadAll");
+const progress=document.getElementById("progress");
+const pBar=document.getElementById("pBar");
+const pText=document.getElementById("pText");
 
 downloadAll.onclick=async()=>{
   const entries=Object.entries(saavnCache);
